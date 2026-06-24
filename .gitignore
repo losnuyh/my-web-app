@@ -1,3 +1,8 @@
 node_modules
 dist
 .DS_Store
+
+# 로컬 비밀 환경변수만 무시 (.env.development / .env.example 은 커밋)
+.env.*
+!.env.example
+

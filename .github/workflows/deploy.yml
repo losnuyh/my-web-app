@@ -1,0 +1,55 @@
+name: Deploy Filsa
+
+on:
+  push:
+    branches:
+      - main
+
+# OIDC로 AWS role을 assume 하려면 id-token 권한 필요
+permissions:
+  id-token: write
+  contents: read
+
+# main에 연속 push 시 이전 배포는 취소
+concurrency:
+  group: deploy-filsa
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # secrets/variables는 dev environment 스코프에서 가져옴
+    environment: dev
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          # 필수 값 — 미설정 시 vite.config.js에서 빌드가 실패합니다.
+          VITE_API_BASE: ${{ vars.API_BASE }}
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ap-northeast-2
+
+      - name: Sync to S3
+        run: aws s3 sync dist/ "s3://${{ vars.S3_BUCKET }}/web/app/" --delete
+
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}" \
+            --paths "/web/app/*"
