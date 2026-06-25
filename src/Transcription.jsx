@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import FilsaScreen from "./FilsaScreen";
-import { Center } from "./ui";
+import { Center, AlreadyDone } from "./ui";
 
 // API 주소. 로컬은 .env.development, 배포는 CI의 VITE_API_BASE 로 주입된다.
 const API_BASE = import.meta.env.VITE_API_BASE;
@@ -27,6 +27,7 @@ export default function Transcription() {
   const userId = searchParams.get("user_id");
 
   const [passage, setPassage] = useState(null);
+  const [completedAt, setCompletedAt] = useState(null); // 오늘 이미 완료한 경우의 완료 시각
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -38,11 +39,16 @@ export default function Transcription() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(userId ? { user_id: userId } : {}),
     })
-      .then((r) => {
+      .then(async (r) => {
+        const data = await r.json().catch(() => ({}));
+        // 오늘 이미 완료한 구독자 → 400 { code: "already_completed", completed_at }
+        if (r.status === 400 && data.code === "already_completed") {
+          setCompletedAt(data.completed_at || "");
+          return;
+        }
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
+        setPassage(data);
       })
-      .then(setPassage)
       .catch((e) => setError(e.message));
   }, [userId]);
 
@@ -73,6 +79,7 @@ export default function Transcription() {
   };
 
   if (error) return <Center>오늘의 구절을 불러오지 못했어요 — {error}</Center>;
+  if (completedAt !== null) return <AlreadyDone completedAt={completedAt} />;
   if (!passage) return <Center>오늘의 말씀을 불러오는 중…</Center>;
 
   return (
