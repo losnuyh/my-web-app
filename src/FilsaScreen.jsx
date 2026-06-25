@@ -20,7 +20,7 @@ import React, { useState, useMemo } from "react";
  *   verseText  본문 (개역개정)         기본값 있음
  *   reference  구절 출처              예: "시편 23편 1절"
  *   dateLabel  날짜 라벨
- *   onComplete 완료 시 콜백 () => void
+ *   onComplete 완료 시 콜백 (text: string) => void  (text = 필사한 텍스트)
  */
 
 const FONT = "Pretendard, 'Apple SD Gothic Neo', sans-serif";
@@ -37,10 +37,11 @@ export default function FilsaScreen({
 
   const TARGET = verseText;
 
-  const finish = () => {
+  // text: 사용자가 필사한 텍스트(서버 완료 기록에 그대로 전달)
+  const finish = (text) => {
     if (!done) {
       setDone(true);
-      onComplete && onComplete();
+      onComplete && onComplete(text);
     }
   };
 
@@ -50,12 +51,13 @@ export default function FilsaScreen({
     const isComposing = !!(e.nativeEvent && e.nativeEvent.isComposing);
     setInput(val);
     setComposing(isComposing);
-    if (!isComposing && val.trim() === TARGET) finish();
+    // setInput 직후라 finish 안에서 input 은 아직 옛 값 → val 을 직접 넘긴다
+    if (!isComposing && val.trim() === TARGET) finish(val);
   };
 
   const handleCompositionEnd = () => {
     setComposing(false);
-    if (!done && input.trim() === TARGET) finish();
+    if (!done && input.trim() === TARGET) finish(input);
   };
 
   // ---- char-level diff ----
