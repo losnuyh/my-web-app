@@ -1,7 +1,9 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 
-// S3 정적 호스팅용. 상대 경로(./)로 빌드해서 버킷 어느 하위 경로에 올려도 동작하게 함.
+// CloudFront 루트 도메인(dev-app.play-logos.com)에서 서빙된다.
+// 절대 경로(/)로 빌드해야 /transcription/result 같은 중첩 라우트에서도
+// 에셋(/assets/...)을 항상 올바르게 가리킨다.
 export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const apiBase = process.env.VITE_API_BASE || env.VITE_API_BASE;
@@ -14,7 +16,7 @@ export default defineConfig(({ command, mode }) => {
   }
 
   return {
-    base: "./",
+    base: "/",
     plugins: [react()],
   };
 });

@@ -7,7 +7,8 @@
 ## S3 정적 웹 배포
 
 Vite로 빌드해서 나온 `dist/`를 S3 정적 호스팅 버킷에 그대로 올리면 됩니다.
-(상대 경로로 빌드되므로 버킷 루트가 아니어도 동작합니다.)
+(CloudFront 루트 도메인에서 서빙되므로 절대 경로 `base: "/"` 로 빌드합니다.
+React Router 딥링크/새로고침은 CloudFront의 404/403 → `index.html` 처리로 동작합니다.)
 
 ```bash
 npm install
