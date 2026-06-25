@@ -8,6 +8,13 @@ const API_BASE = import.meta.env.VITE_API_BASE;
 // 없으면 비구독자로 취급(말씀만 표시, 시작/완료 기록 없음).
 const USER_ID = new URLSearchParams(window.location.search).get("user_id");
 
+// 필사 화면은 /transcription 경로에서 노출된다.
+//   예: https://dev-app.play-logos.com/transcription?user_id={user_id}
+// (S3 하위 경로 배포도 고려해 endsWith 로 판별)
+const IS_TRANSCRIPTION = window.location.pathname
+  .replace(/\/+$/, "")
+  .endsWith("/transcription");
+
 const FONT = "Pretendard, 'Apple SD Gothic Neo', sans-serif";
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -32,6 +39,7 @@ export default function App() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    if (!IS_TRANSCRIPTION) return;
     // 오늘의 말씀 열기(= 필사 시작). GET → POST 로 변경되었고,
     // 파라미터는 쿼리스트링이 아닌 JSON 바디로 보낸다.
     // user_id 가 없으면 빈 바디 {} 를 보낸다(없이 보내면 422).
@@ -74,6 +82,7 @@ export default function App() {
       });
   };
 
+  if (!IS_TRANSCRIPTION) return <Center>여기는 빈 페이지예요 🙂</Center>;
   if (error) return <Center>오늘의 구절을 불러오지 못했어요 — {error}</Center>;
   if (!passage) return <Center>오늘의 말씀을 불러오는 중…</Center>;
 
