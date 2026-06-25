@@ -87,6 +87,7 @@ export default function Transcription() {
       verseText={passage.text}
       reference={passage.reference}
       dateLabel={formatDate(passage.date)}
+      startedAt={passage.started_at}
       onComplete={handleComplete}
     />
   );

@@ -1,6 +1,39 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 export const FONT = "Pretendard, 'Apple SD Gothic Neo', sans-serif";
+
+// 경과 초 → "M:SS" (1시간 넘으면 "H:MM:SS")
+function formatElapsed(totalSec) {
+  const pad = (n) => String(n).padStart(2, "0");
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
+}
+
+// started_at(ISO) 부터 지금까지 경과 시간을 매초 갱신해 보여주는 타이머.
+// running=false 면 갱신을 멈춰 그 시점 기록으로 고정한다(완료 시).
+export function Timer({ startedAt, running = true }) {
+  const startMs = useMemo(() => {
+    const t = new Date(startedAt).getTime();
+    return Number.isNaN(t) ? null : t;
+  }, [startedAt]);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!running || startMs === null) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [running, startMs]);
+
+  if (startMs === null) return null;
+  const sec = Math.max(0, Math.floor((now - startMs) / 1000));
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, flex: "none", background: "#f1eeff", color: "#6244ff", borderRadius: 20, padding: "5px 11px", fontSize: 12.5, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
+      ⏱ {formatElapsed(sec)}
+    </span>
+  );
+}
 
 // 로딩/에러/빈 페이지 등 한 줄 안내를 가운데 정렬해 보여주는 박스.
 export function Center({ children }) {

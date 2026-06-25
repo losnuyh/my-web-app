@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { isSpace, matchesTarget, scoreInput } from "./scoring";
+import { Timer } from "./ui";
 
 /**
  * 로고스(logos) — 필사 화면 (게임풍)
@@ -31,6 +32,7 @@ export default function FilsaScreen({
   verseText = "여호와는 나의 목자시니 내게 부족함이 없으리로다",
   reference = "시편 23편 1절",
   dateLabel = "2026년 6월 23일 화요일",
+  startedAt,
   onComplete,
 } = {}) {
   const [input, setInput] = useState("");
@@ -120,9 +122,12 @@ export default function FilsaScreen({
 
         <div style={{ position: "relative", width: "100%", maxWidth: 460, background: "#fff", borderRadius: 30, boxShadow: "0 14px 0 #e3def7, 0 30px 56px rgba(60,40,160,0.16)", padding: "26px 24px 24px", overflow: "hidden", boxSizing: "border-box" }}>
           {/* header */}
-          <div>
-            <div style={{ fontSize: 22, fontWeight: 900, letterSpacing: "-0.03em" }}>오늘의 말씀 ✏️</div>
-            <div style={{ fontSize: 12.5, color: "#8d87a8", marginTop: 4, fontWeight: 600 }}>{dateLabel}</div>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+            <div>
+              <div style={{ fontSize: 22, fontWeight: 900, letterSpacing: "-0.03em" }}>오늘의 말씀 ✏️</div>
+              <div style={{ fontSize: 12.5, color: "#8d87a8", marginTop: 4, fontWeight: 600 }}>{dateLabel}</div>
+            </div>
+            {startedAt && <Timer startedAt={startedAt} running={!view.done} />}
           </div>
 
           {/* verse card */}
