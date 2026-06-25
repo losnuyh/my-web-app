@@ -80,8 +80,12 @@ export default function FilsaScreen({
 
   const handleInput = (e) => {
     if (done) return;
-    const val = e.target.value;
     const isComposing = !!(e.nativeEvent && e.nativeEvent.isComposing);
+    // 띄어쓰기 2개 연속 방지 — 연속된 공백은 하나로 합친다(더블스페이스 입력 차단)
+    const raw = e.target.value;
+    const val = raw.replace(/ {2,}/g, " ");
+    // state 가 그대로면 리렌더가 생략돼 DOM 에 두 칸이 남는다 → textarea 값을 직접 맞춘다
+    if (val !== raw) e.target.value = val;
     setInput(val);
     setComposing(isComposing);
     // setInput 직후라 finish 안에서 input 은 아직 옛 값 → val 을 직접 넘긴다
