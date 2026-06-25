@@ -25,6 +25,14 @@ import React, { useState, useMemo } from "react";
 
 const FONT = "Pretendard, 'Apple SD Gothic Neo', sans-serif";
 
+// 모바일 키보드가 끼워넣는, 눈엔 똑같지만 코드가 다른 문자를 흡수한다.
+//  - 공백류 통일: \s 는 NBSP(U+00A0) 등 모든 공백을 포함 → 일반 공백과 동일 취급
+//  - 한글 정규화: iOS가 만드는 분해형(NFD) 한글을 NFC로 맞춰서 비교
+const isSpace = (c) => /\s/.test(c);
+const eqChar = (a, b) => (isSpace(a) && isSpace(b)) || a.normalize("NFC") === b.normalize("NFC");
+// 완료/정답 판정용: 정규화 + 공백류 통일 + 중복 공백 합치기 + 양끝 trim
+const normFull = (s) => s.normalize("NFC").replace(/\s+/g, " ").trim();
+
 export default function FilsaScreen({
   verseText = "여호와는 나의 목자시니 내게 부족함이 없으리로다",
   reference = "시편 23편 1절",
@@ -52,17 +60,19 @@ export default function FilsaScreen({
     setInput(val);
     setComposing(isComposing);
     // setInput 직후라 finish 안에서 input 은 아직 옛 값 → val 을 직접 넘긴다
-    if (!isComposing && val.trim() === TARGET) finish(val);
+    if (!isComposing && normFull(val) === normFull(TARGET)) finish(val);
   };
 
   const handleCompositionEnd = () => {
     setComposing(false);
-    if (!done && input.trim() === TARGET) finish(input);
+    if (!done && normFull(input) === normFull(TARGET)) finish(input);
   };
 
   // ---- char-level diff ----
   const styleFor = (s) => {
-    const base = { display: "inline-block" };
+    // inline-block 을 쓰면 글자마다 박스가 생겨 textarea 와 줄바꿈이 어긋난다.
+    // 일반 inline 으로 두면 본문 텍스트 흐름이 textarea 와 동일하게 정렬된다.
+    const base = {};
     if (s === "ok") return { ...base, color: "#241c4d" };
     if (s === "bad") return { ...base, color: "#ff5f4c", background: "rgba(255,95,76,0.14)", borderRadius: 5 };
     if (s === "extra") return { ...base, color: "#ff5f4c", background: "rgba(255,95,76,0.22)", borderRadius: 5, textDecoration: "line-through" };
@@ -77,7 +87,7 @@ export default function FilsaScreen({
     let okCount = 0, err = 0, firstErr = -1;
     for (let i = 0; i < t.length; i++) {
       if (i < input.length) {
-        const ok = input[i] === t[i];
+        const ok = eqChar(input[i], t[i]);
         if (i === composeIdx && !ok) {
           segs.push({ ch: input[i], cls: "typing" });
         } else {
@@ -92,7 +102,7 @@ export default function FilsaScreen({
       if (i === composeIdx) segs.push({ ch: input[i], cls: "typing" });
       else { err++; if (firstErr < 0) firstErr = i; segs.push({ ch: input[i], cls: "extra" }); }
     }
-    const isDone = done || (!composing && input.trim() === t && input.length > 0);
+    const isDone = done || (!composing && normFull(input) === normFull(t) && input.length > 0);
     return { segs, value: input, okCount, err, firstErr, done: isDone };
   }, [input, composing, done, TARGET]);
 
@@ -148,9 +158,13 @@ export default function FilsaScreen({
           <div style={{ fontSize: 12.5, fontWeight: 800, color: "#6b6589", margin: "18px 0 9px" }}>여기에 그대로 입력하세요</div>
           <div style={{ position: "relative", border: `2.5px solid ${border}`, borderRadius: 16, background: "#faf9ff", transition: "border-color .15s" }}>
             <div style={{ position: "relative", zIndex: 1, pointerEvents: "none", padding: 16, fontFamily: FONT, fontSize: 19, lineHeight: 1.95, letterSpacing: "-0.01em", wordBreak: "break-all", whiteSpace: "pre-wrap", minHeight: 118 }}>
-              {view.segs.map((seg, i) => (
-                <span key={i} style={styleFor(seg.cls)}>{seg.ch}</span>
-              ))}
+              {view.segs.map((seg, i) => {
+                // 오답인 공백류(NBSP 등)는 빈칸이라 빨강이 안 보인다 → 가운뎃점으로 표시
+                const wsErr = (seg.cls === "bad" || seg.cls === "extra") && isSpace(seg.ch);
+                return (
+                  <span key={i} style={styleFor(seg.cls)}>{wsErr ? "·" : seg.ch}</span>
+                );
+              })}
             </div>
             <textarea
               className="lg-ta"
