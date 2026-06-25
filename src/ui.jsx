@@ -56,9 +56,41 @@ function formatCompletedAt(iso) {
   });
 }
 
+// 초 → "1분 35초" (1분 미만이면 "35초")
+function formatDuration(totalSec) {
+  if (totalSec == null) return "";
+  const s = Math.round(totalSec);
+  const m = Math.floor(s / 60);
+  return m > 0 ? `${m}분 ${s % 60}초` : `${s}초`;
+}
+
+// 등수 보드 — 서버 응답(data)의 speed_rank / submit_rank / elapsed_seconds 를 표시.
+// 값이 없는 항목은 자동 생략, 셋 다 없으면 아무것도 안 그린다.
+export function RankBoard({ data, style }) {
+  if (!data) return null;
+  const stats = [
+    data.speed_rank != null && { icon: "⚡", label: "속도 등수", value: `${data.speed_rank}등` },
+    data.submit_rank != null && { icon: "🏅", label: "제출 순번", value: `${data.submit_rank}번째` },
+    data.elapsed_seconds != null && { icon: "⏱", label: "걸린 시간", value: formatDuration(data.elapsed_seconds) },
+  ].filter(Boolean);
+  if (stats.length === 0) return null;
+  return (
+    <div style={{ display: "flex", gap: 8, ...style }}>
+      {stats.map((s) => (
+        <div key={s.label} style={{ flex: 1, background: "#f6f4ff", borderRadius: 14, padding: "13px 6px" }}>
+          <div style={{ fontSize: 18 }}>{s.icon}</div>
+          <div style={{ fontSize: 11, color: "#8d87a8", fontWeight: 700, marginTop: 5 }}>{s.label}</div>
+          <div style={{ fontSize: 15, color: "#6244ff", fontWeight: 900, marginTop: 3, fontVariantNumeric: "tabular-nums" }}>{s.value}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // 오늘 필사를 이미 마친 구독자에게 보여주는 화면.
-export function AlreadyDone({ completedAt }) {
-  const when = formatCompletedAt(completedAt);
+// data = 서버의 already_completed 응답 { completed_at, submit_rank, speed_rank, elapsed_seconds }
+export function AlreadyDone({ data }) {
+  const when = formatCompletedAt(data?.completed_at);
   return (
     <div style={{ minHeight: "100vh", background: "#f3f0ff", fontFamily: FONT, color: "#241c4d", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, boxSizing: "border-box" }}>
       <div style={{ width: "100%", maxWidth: 420, background: "#fff", borderRadius: 28, boxShadow: "0 12px 0 #e3def7, 0 28px 50px rgba(60,40,160,0.14)", padding: "40px 28px", textAlign: "center", boxSizing: "border-box" }}>
@@ -67,8 +99,9 @@ export function AlreadyDone({ completedAt }) {
         <div style={{ fontSize: 14, color: "#6b6589", marginTop: 10, lineHeight: 1.65, fontWeight: 500, wordBreak: "keep-all" }}>
           오늘의 필사를 이미 마쳤어요.<br />내일 새로운 말씀으로 만나요!
         </div>
+        <RankBoard data={data} style={{ marginTop: 22 }} />
         {when && (
-          <div style={{ display: "inline-block", marginTop: 22, background: "#f6f4ff", borderRadius: 14, padding: "12px 18px", fontSize: 13, color: "#6244ff", fontWeight: 800 }}>
+          <div style={{ marginTop: 14, fontSize: 12.5, color: "#a99ff0", fontWeight: 700 }}>
             완료 시각 · {when}
           </div>
         )}

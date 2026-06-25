@@ -27,7 +27,8 @@ export default function Transcription() {
   const userId = searchParams.get("user_id");
 
   const [passage, setPassage] = useState(null);
-  const [completedAt, setCompletedAt] = useState(null); // 오늘 이미 완료한 경우의 완료 시각
+  const [already, setAlready] = useState(null); // 오늘 이미 완료한 경우의 응답(완료시각+등수)
+  const [result, setResult] = useState(null); // 방금 완료 기록의 서버 응답(등수)
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -41,9 +42,9 @@ export default function Transcription() {
     })
       .then(async (r) => {
         const data = await r.json().catch(() => ({}));
-        // 오늘 이미 완료한 구독자 → 400 { code: "already_completed", completed_at }
+        // 오늘 이미 완료한 구독자 → 400 { code: "already_completed", completed_at, ...등수 }
         if (r.status === 400 && data.code === "already_completed") {
-          setCompletedAt(data.completed_at || "");
+          setAlready(data);
           return;
         }
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -69,17 +70,21 @@ export default function Transcription() {
           );
         }
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        // 200 { completed: true } 일치/이미 완료, { completed: false } 미기록(비구독자 등)
+        // 200 { completed, submit_rank, speed_rank, elapsed_seconds }
+        // (비구독자/멱등 재호출은 등수 없이 { completed } 만 올 수 있음)
         return data;
       })
+      .then(setResult)
       .catch((e) => {
         // 화면 완료 UX 는 로컬 채점으로 이미 표시됨. 기록 실패는 로깅만.
+        // result 를 빈 값으로 채워 '저장 중…' 표시는 거둔다.
         console.error("필사 완료 기록 실패:", e.message);
+        setResult({});
       });
   };
 
   if (error) return <Center>오늘의 구절을 불러오지 못했어요 — {error}</Center>;
-  if (completedAt !== null) return <AlreadyDone completedAt={completedAt} />;
+  if (already) return <AlreadyDone data={already} />;
   if (!passage) return <Center>오늘의 말씀을 불러오는 중…</Center>;
 
   return (
@@ -88,6 +93,7 @@ export default function Transcription() {
       reference={passage.reference}
       dateLabel={formatDate(passage.date)}
       startedAt={passage.started_at}
+      result={result}
       onComplete={handleComplete}
     />
   );

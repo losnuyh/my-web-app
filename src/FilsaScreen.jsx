@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { isSpace, matchesTarget, scoreInput } from "./scoring";
-import { Timer } from "./ui";
+import { Timer, RankBoard } from "./ui";
 
 /**
  * 로고스(logos) — 필사 화면 (게임풍)
@@ -33,6 +33,7 @@ export default function FilsaScreen({
   reference = "시편 23편 1절",
   dateLabel = "2026년 6월 23일 화요일",
   startedAt,
+  result,
   onComplete,
 } = {}) {
   const [input, setInput] = useState("");
@@ -179,6 +180,12 @@ export default function FilsaScreen({
                 <div style={{ fontSize: 16, color: "#2a2550", lineHeight: 1.9, wordBreak: "keep-all", fontWeight: 600 }}>“{TARGET}”</div>
                 <div style={{ fontSize: 12, color: "#6244ff", fontWeight: 800, marginTop: 11 }}>{reference} · 개역개정</div>
               </div>
+              {/* 서버가 등수를 내려주면 표시, 아직이면 저장 중 안내 */}
+              {result == null ? (
+                <div style={{ position: "relative", zIndex: 2, marginTop: 16, fontSize: 12.5, color: "#a99ff0", fontWeight: 700 }}>기록 저장 중…</div>
+              ) : (
+                <RankBoard data={result} style={{ position: "relative", zIndex: 2, marginTop: 18, width: "100%", maxWidth: 320 }} />
+              )}
             </div>
           )}
         </div>
