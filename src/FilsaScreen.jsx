@@ -25,13 +25,38 @@ import React, { useState, useMemo } from "react";
 
 const FONT = "Pretendard, 'Apple SD Gothic Neo', sans-serif";
 
-// 모바일 키보드가 끼워넣는, 눈엔 똑같지만 코드가 다른 문자를 흡수한다.
-//  - 공백류 통일: \s 는 NBSP(U+00A0) 등 모든 공백을 포함 → 일반 공백과 동일 취급
-//  - 한글 정규화: iOS가 만드는 분해형(NFD) 한글을 NFC로 맞춰서 비교
+// \s 는 NBSP(U+00A0) 등 모든 공백을 포함 → 공백류를 일반 공백과 동일 취급
 const isSpace = (c) => /\s/.test(c);
-const eqChar = (a, b) => (isSpace(a) && isSpace(b)) || a.normalize("NFC") === b.normalize("NFC");
-// 완료/정답 판정용: 정규화 + 공백류 통일 + 중복 공백 합치기 + 양끝 trim
+// 완료/정답 판정용: NFC 정규화 + 공백류 통일 + 중복 공백 합치기 + 양끝 trim
 const normFull = (s) => s.normalize("NFC").replace(/\s+/g, " ").trim();
+
+// ── 한글 자모 분해 ───────────────────────────────────────────────
+// 글자(음절)가 아니라 "자모" 단위로 비교하기 위함.
+// 조합 중인 글자("ㅎ","하","한"…)도 목표 자모열의 prefix면 오답이 아니다.
+// (모바일 IME 의 조합 플래그에 의존하지 않고도 선판정을 막는다.)
+const CHO = ["ㄱ","ㄲ","ㄴ","ㄷ","ㄸ","ㄹ","ㅁ","ㅂ","ㅃ","ㅅ","ㅆ","ㅇ","ㅈ","ㅉ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"];
+// 중성·종성의 복합 자모는 낱자로 쪼갠다(ㅘ→ㅗㅏ, ㄺ→ㄹㄱ). 입력 중간 상태가 prefix 가 되도록.
+const JUNG = [["ㅏ"],["ㅐ"],["ㅑ"],["ㅒ"],["ㅓ"],["ㅔ"],["ㅕ"],["ㅖ"],["ㅗ"],["ㅗ","ㅏ"],["ㅗ","ㅐ"],["ㅗ","ㅣ"],["ㅛ"],["ㅜ"],["ㅜ","ㅓ"],["ㅜ","ㅔ"],["ㅜ","ㅣ"],["ㅠ"],["ㅡ"],["ㅡ","ㅣ"],["ㅣ"]];
+const JONG = [[],["ㄱ"],["ㄲ"],["ㄱ","ㅅ"],["ㄴ"],["ㄴ","ㅈ"],["ㄴ","ㅎ"],["ㄷ"],["ㄹ"],["ㄹ","ㄱ"],["ㄹ","ㅁ"],["ㄹ","ㅂ"],["ㄹ","ㅅ"],["ㄹ","ㅌ"],["ㄹ","ㅍ"],["ㄹ","ㅎ"],["ㅁ"],["ㅂ"],["ㅂ","ㅅ"],["ㅅ"],["ㅆ"],["ㅇ"],["ㅈ"],["ㅊ"],["ㅋ"],["ㅌ"],["ㅍ"],["ㅎ"]];
+
+const charToJamo = (ch) => {
+  if (isSpace(ch)) return [" "]; // 공백류는 모두 일반 공백으로
+  const c = ch.charCodeAt(0);
+  if (c >= 0xac00 && c <= 0xd7a3) {
+    const s = c - 0xac00;
+    return [CHO[Math.floor(s / 588)], ...JUNG[Math.floor((s % 588) / 28)], ...JONG[s % 28]];
+  }
+  return [ch]; // 한글 외(영문/숫자/문장부호/조합 중 낱자) 는 그대로
+};
+
+// 문자열 → 자모열. 각 자모에 원본 글자 index(ci) 를 달아 글자별 채점에 쓴다.
+const decompose = (str) => {
+  const s = str.normalize("NFC");
+  const arr = [];
+  for (let ci = 0; ci < s.length; ci++)
+    for (const j of charToJamo(s[ci])) arr.push({ j, ci });
+  return arr;
+};
 
 export default function FilsaScreen({
   verseText = "여호와는 나의 목자시니 내게 부족함이 없으리로다",
@@ -82,25 +107,41 @@ export default function FilsaScreen({
 
   const view = useMemo(() => {
     const t = TARGET;
-    const composeIdx = composing && input.length > 0 ? input.length - 1 : -1;
+    // ── 자모 단위 비교 ──
+    // 입력 자모열이 목표 자모열과 어디까지 일치하는지(m)를 구한다.
+    // m 이전 자모는 정답, m 이후(첫 불일치~)는 오답. 글자에 오답 자모가 하나라도
+    // 걸리면 그 글자를 'bad' 로 본다. 조합 중인 마지막 글자는 보통 prefix 라 정답.
+    const Tj = decompose(t), Ij = decompose(input);
+    let m = 0;
+    while (m < Ij.length && m < Tj.length && Ij[m].j === Tj[m].j) m++;
+    const badChar = {};
+    for (let k = 0; k < Ij.length; k++) badChar[Ij[k].ci] = badChar[Ij[k].ci] || k >= m;
+
     const segs = [];
+    // 마지막(=조합 중) 글자는 빨강으로 선판정하지 않고 '입력 중'(보라)로 둔다.
+    // 천지인처럼 중간 상태가 목표의 prefix 가 아닌 경우("히"→"하")도 안 튀게.
+    const last = input.length - 1;
     let okCount = 0, err = 0, firstErr = -1;
     for (let i = 0; i < t.length; i++) {
       if (i < input.length) {
-        const ok = eqChar(input[i], t[i]);
-        if (i === composeIdx && !ok) {
+        const bad = badChar[i];
+        if (bad && i === last) {
           segs.push({ ch: input[i], cls: "typing" });
         } else {
-          if (ok) okCount++; else { err++; if (firstErr < 0) firstErr = i; }
-          segs.push({ ch: input[i], cls: ok ? "ok" : "bad" });
+          if (bad) { err++; if (firstErr < 0) firstErr = i; } else okCount++;
+          segs.push({ ch: input[i], cls: bad ? "bad" : "ok" });
         }
       } else {
         segs.push({ ch: t[i], cls: "pending" });
       }
     }
     for (let i = t.length; i < input.length; i++) {
-      if (i === composeIdx) segs.push({ ch: input[i], cls: "typing" });
-      else { err++; if (firstErr < 0) firstErr = i; segs.push({ ch: input[i], cls: "extra" }); }
+      if (i === last) {
+        segs.push({ ch: input[i], cls: "typing" });
+      } else {
+        err++; if (firstErr < 0) firstErr = i;
+        segs.push({ ch: input[i], cls: "extra" });
+      }
     }
     const isDone = done || (!composing && normFull(input) === normFull(t) && input.length > 0);
     return { segs, value: input, okCount, err, firstErr, done: isDone };
