@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { isSpace, matchesTarget, scoreInput } from "./scoring";
-import { Timer, RankBoard } from "./ui";
+import { Timer, RankBoard, FONT } from "./ui";
 
 /**
  * 로고스(logos) — 필사 화면 (게임풍)
@@ -23,10 +23,10 @@ import { Timer, RankBoard } from "./ui";
  *   verseText  본문 (개역개정)         기본값 있음
  *   reference  구절 출처              예: "시편 23편 1절"
  *   dateLabel  날짜 라벨
+ *   startedAt  필사 시작 시각(ISO) — 경과 타이머용. 없으면 타이머 숨김
+ *   result     완료 기록 서버 응답(등수). null이면 '저장 중…' 표시
  *   onComplete 완료 시 콜백 (text: string) => void  (text = 필사한 텍스트)
  */
-
-const FONT = "Pretendard, 'Apple SD Gothic Neo', sans-serif";
 
 export default function FilsaScreen({
   verseText = "여호와는 나의 목자시니 내게 부족함이 없으리로다",
@@ -69,16 +69,14 @@ export default function FilsaScreen({
     if (!done && matchesTarget(input, TARGET)) finish(input);
   };
 
-  // ---- char-level diff ----
+  // 글자 상태별 스타일. inline-block 을 주지 않아야(=일반 inline) textarea 와
+  // 줄바꿈이 동일하게 정렬된다.
   const styleFor = (s) => {
-    // inline-block 을 쓰면 글자마다 박스가 생겨 textarea 와 줄바꿈이 어긋난다.
-    // 일반 inline 으로 두면 본문 텍스트 흐름이 textarea 와 동일하게 정렬된다.
-    const base = {};
-    if (s === "ok") return { ...base, color: "#241c4d" };
-    if (s === "bad") return { ...base, color: "#ff5f4c", background: "rgba(255,95,76,0.14)", borderRadius: 5 };
-    if (s === "extra") return { ...base, color: "#ff5f4c", background: "rgba(255,95,76,0.22)", borderRadius: 5, textDecoration: "line-through" };
-    if (s === "typing") return { ...base, color: "#6244ff", background: "rgba(98,68,255,0.12)", borderRadius: 5 };
-    return { ...base, color: "#cfc8ee" };
+    if (s === "bad") return { color: "#ff5f4c", background: "rgba(255,95,76,0.14)", borderRadius: 5 };
+    if (s === "extra") return { color: "#ff5f4c", background: "rgba(255,95,76,0.22)", borderRadius: 5, textDecoration: "line-through" };
+    if (s === "typing") return { color: "#6244ff", background: "rgba(98,68,255,0.12)", borderRadius: 5 };
+    if (s === "pending") return { color: "#cfc8ee" };
+    return { color: "#241c4d" }; // ok
   };
 
   const view = useMemo(() => {

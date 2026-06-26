@@ -4,7 +4,7 @@ import Transcription from "./Transcription";
 import { Center } from "./ui";
 
 // 필사 화면은 /transcription 경로에서 노출된다.
-//   예: https://dev-app.play-logos.com/transcription?user_id={user_id}
+//   예: https://dev-app.play-logos.com/transcription?token={token}
 export default function App() {
   return (
     <Routes>

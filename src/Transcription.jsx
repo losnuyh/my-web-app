@@ -6,6 +6,17 @@ import { Center, AlreadyDone, Expired, NotFound } from "./ui";
 // API 주소. 로컬은 .env.development, 배포는 CI의 VITE_API_BASE 로 주입된다.
 const API_BASE = import.meta.env.VITE_API_BASE;
 
+// 공용 POST: JSON 을 보내고 { status, ok, data } 로 받는다.
+async function postJson(path, body) {
+  const r = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await r.json().catch(() => ({}));
+  return { status: r.status, ok: r.ok, data };
+}
+
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
 // "2026-06-24" → "2026년 6월 24일 수요일"
@@ -38,39 +49,28 @@ export default function Transcription() {
       return;
     }
     // 필사 시작 — 토큰만 보낸다.
-    fetch(`${API_BASE}/transcriptions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token }),
-    })
-      .then(async (r) => {
-        const data = await r.json().catch(() => ({}));
-        if (r.ok) {
+    postJson("/transcriptions", { token })
+      .then(({ status, ok, data }) => {
+        if (ok) {
           setPassage(data); // { date, reference, text, started_at }
           return;
         }
-        // 에러 분기
-        if (r.status === 400 && data.code === "already_completed") return setNotice({ type: "already", data });
-        if (r.status === 400 && data.code === "expired") return setNotice({ type: "expired", data });
-        if (r.status === 404 && data.code === "not_found") return setNotice({ type: "notfound", data });
-        if (r.status === 403) return setError("유효하지 않은 링크예요. 알림톡의 버튼으로 다시 들어와 주세요.");
-        throw new Error(`HTTP ${r.status}`);
+        if (status === 400 && data.code === "already_completed") return setNotice({ type: "already", data });
+        if (status === 400 && data.code === "expired") return setNotice({ type: "expired", data });
+        if (status === 404 && data.code === "not_found") return setNotice({ type: "notfound", data });
+        if (status === 403) return setError("유효하지 않은 링크예요. 알림톡의 버튼으로 다시 들어와 주세요.");
+        throw new Error(`HTTP ${status}`);
       })
       .catch((e) => setError(e.message));
   }, [token]);
 
   // 필사 완료. 100% 일치 시 서버에 완료를 기록한다.
   const handleComplete = (text) => {
-    fetch(`${API_BASE}/transcriptions/complete`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token, text }),
-    })
-      .then(async (r) => {
-        const data = await r.json().catch(() => ({}));
+    postJson("/transcriptions/complete", { token, text })
+      .then(({ status, ok, data }) => {
         // 불일치 → 400 { detail } (재시도 가능)
-        if (r.status === 400) throw new Error(data.detail || "필사한 텍스트가 오늘의 말씀과 일치하지 않습니다.");
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        if (status === 400) throw new Error(data.detail || "필사한 텍스트가 오늘의 말씀과 일치하지 않습니다.");
+        if (!ok) throw new Error(`HTTP ${status}`);
         // 200 { completed, submit_rank, speed_rank, elapsed_seconds, total, average_elapsed_seconds }
         // (멱등 재완료는 { completed } 만 올 수 있음)
         return data;
