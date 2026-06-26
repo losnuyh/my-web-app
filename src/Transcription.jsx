@@ -1,21 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import FilsaScreen from "./FilsaScreen";
+import { postJson } from "./api";
 import { Center, AlreadyDone, Expired, NotFound } from "./ui";
-
-// API 주소. 로컬은 .env.development, 배포는 CI의 VITE_API_BASE 로 주입된다.
-const API_BASE = import.meta.env.VITE_API_BASE;
-
-// 공용 POST: JSON 을 보내고 { status, ok, data } 로 받는다.
-async function postJson(path, body) {
-  const r = await fetch(`${API_BASE}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const data = await r.json().catch(() => ({}));
-  return { status: r.status, ok: r.ok, data };
-}
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -48,8 +35,8 @@ export default function Transcription() {
       setError("유효하지 않은 링크예요. 알림톡의 버튼으로 다시 들어와 주세요.");
       return;
     }
-    // 필사 시작 — 토큰만 보낸다.
-    postJson("/transcriptions", { token })
+    // 필사 시작 — 토큰은 헤더, 본문 없음.
+    postJson("/transcriptions", token)
       .then(({ status, ok, data }) => {
         if (ok) {
           setPassage(data); // { date, reference, text, started_at }
@@ -66,7 +53,7 @@ export default function Transcription() {
 
   // 필사 완료. 100% 일치 시 서버에 완료를 기록한다.
   const handleComplete = (text) => {
-    postJson("/transcriptions/complete", { token, text })
+    postJson("/transcriptions/complete", token, { text })
       .then(({ status, ok, data }) => {
         // 불일치 → 400 { detail } (재시도 가능)
         if (status === 400) throw new Error(data.detail || "필사한 텍스트가 오늘의 말씀과 일치하지 않습니다.");
@@ -85,7 +72,7 @@ export default function Transcription() {
   };
 
   if (error) return <Center>{error}</Center>;
-  if (notice?.type === "already") return <AlreadyDone data={notice.data} />;
+  if (notice?.type === "already") return <AlreadyDone data={notice.data} token={token} />;
   if (notice?.type === "expired") return <Expired data={notice.data} />;
   if (notice?.type === "notfound") return <NotFound date={notice.data?.date} />;
   if (!passage) return <Center>오늘의 말씀을 불러오는 중…</Center>;
@@ -97,6 +84,7 @@ export default function Transcription() {
       dateLabel={formatDate(passage.date)}
       startedAt={passage.started_at}
       result={result}
+      token={token}
       onComplete={handleComplete}
     />
   );

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { isSpace, matchesTarget, scoreInput } from "./scoring";
 import { Timer, RankBoard, FONT } from "./ui";
+import NicknamePrompt from "./NicknamePrompt";
 
 /**
  * 로고스(logos) — 필사 화면 (게임풍)
@@ -34,6 +35,7 @@ export default function FilsaScreen({
   dateLabel = "2026년 6월 23일 화요일",
   startedAt,
   result,
+  token,
   onComplete,
 } = {}) {
   const [input, setInput] = useState("");
@@ -184,6 +186,7 @@ export default function FilsaScreen({
               ) : (
                 <RankBoard data={result} style={{ position: "relative", zIndex: 2, marginTop: 18, width: "100%", maxWidth: 320 }} />
               )}
+              <NicknamePrompt token={token} />
             </div>
           )}
         </div>

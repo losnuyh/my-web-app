@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import NicknamePrompt from "./NicknamePrompt";
 
 export const FONT = "Pretendard, 'Apple SD Gothic Neo', sans-serif";
 
@@ -57,7 +58,7 @@ function formatCompletedAt(iso) {
 }
 
 // 초 → "1분 35초" (1분 미만이면 "35초")
-function formatDuration(totalSec) {
+export function formatDuration(totalSec) {
   if (totalSec == null) return "";
   const s = Math.round(totalSec);
   const m = Math.floor(s / 60);
@@ -125,7 +126,7 @@ function VerseCard({ text, reference, label = "📖 오늘의 말씀 · 개역�
 
 // 오늘 필사를 이미 마친 구독자 화면.
 // data = already_completed 응답 { completed_at, date, reference, text, +등수 }
-export function AlreadyDone({ data }) {
+export function AlreadyDone({ data, token }) {
   const when = formatCompletedAt(data?.completed_at);
   return (
     <CardScreen>
@@ -133,6 +134,7 @@ export function AlreadyDone({ data }) {
       <VerseCard text={data?.text} reference={data?.reference} />
       <RankBoard data={data} style={{ marginTop: 18 }} />
       {when && <div style={{ marginTop: 14, fontSize: 12.5, color: "#a99ff0", fontWeight: 700 }}>완료 시각 · {when}</div>}
+      <NicknamePrompt token={token} />
     </CardScreen>
   );
 }
