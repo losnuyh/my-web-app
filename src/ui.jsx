@@ -64,14 +64,15 @@ function formatDuration(totalSec) {
   return m > 0 ? `${m}분 ${s % 60}초` : `${s}초`;
 }
 
-// 등수 보드 — 서버 응답(data)의 speed_rank / submit_rank / elapsed_seconds 를 표시.
+// 등수 보드 — 서버 응답(data)의 등수/시간과 전체 참가자(total)·평균을 함께 표시.
 // 값이 없는 항목은 자동 생략, 셋 다 없으면 아무것도 안 그린다.
 export function RankBoard({ data, style }) {
   if (!data) return null;
+  const total = data.total;
   const stats = [
-    data.speed_rank != null && { icon: "⚡", label: "속도 등수", value: `${data.speed_rank}등` },
-    data.submit_rank != null && { icon: "🏅", label: "제출 순번", value: `${data.submit_rank}번째` },
-    data.elapsed_seconds != null && { icon: "⏱", label: "걸린 시간", value: formatDuration(data.elapsed_seconds) },
+    data.speed_rank != null && { icon: "⚡", label: "속도 등수", value: `${data.speed_rank}등`, sub: total != null ? `${total}명 중` : null },
+    data.submit_rank != null && { icon: "🏅", label: "제출 순번", value: `${data.submit_rank}번째`, sub: total != null ? `${total}명` : null },
+    data.elapsed_seconds != null && { icon: "⏱", label: "걸린 시간", value: formatDuration(data.elapsed_seconds), sub: data.average_elapsed_seconds != null ? `평균 ${formatDuration(data.average_elapsed_seconds)}` : null },
   ].filter(Boolean);
   if (stats.length === 0) return null;
   return (
@@ -81,6 +82,7 @@ export function RankBoard({ data, style }) {
           <div style={{ fontSize: 18 }}>{s.icon}</div>
           <div style={{ fontSize: 11, color: "#8d87a8", fontWeight: 700, marginTop: 5 }}>{s.label}</div>
           <div style={{ fontSize: 15, color: "#6244ff", fontWeight: 900, marginTop: 3, fontVariantNumeric: "tabular-nums" }}>{s.value}</div>
+          {s.sub && <div style={{ fontSize: 10.5, color: "#a99ff0", fontWeight: 700, marginTop: 2 }}>{s.sub}</div>}
         </div>
       ))}
     </div>
