@@ -1,28 +1,26 @@
 name: Deploy Filsa
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 배포 대상 환경
+        type: choice
+        options: [dev, prod]
+        default: dev
 
 # OIDC로 AWS role을 assume 하려면 id-token 권한 필요
 permissions:
   id-token: write
   contents: read
 
-# main에 연속 push 시 이전 배포는 취소
-concurrency:
-  group: deploy-filsa
-  cancel-in-progress: true
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # secrets/variables는 dev environment 스코프에서 가져옴
-    environment: dev
+    # 선택한 환경(dev/prod)의 secrets/variables 를 사용
+    environment: ${{ inputs.environment }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -39,7 +37,7 @@ jobs:
           # 필수 값 — 미설정 시 vite.config.js에서 빌드가 실패합니다.
           VITE_API_BASE: ${{ vars.API_BASE }}
 
-      - name: Configure AWS credentials (OIDC)
+      - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
