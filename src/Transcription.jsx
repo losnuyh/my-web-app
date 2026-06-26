@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import FilsaScreen from "./FilsaScreen";
-import { Center, AlreadyDone } from "./ui";
+import { Center, AlreadyDone, Expired, NotFound } from "./ui";
 
 // API 주소. 로컬은 .env.development, 배포는 CI의 VITE_API_BASE 로 주입된다.
 const API_BASE = import.meta.env.VITE_API_BASE;
@@ -18,60 +18,61 @@ function formatDate(iso) {
 
 /**
  * 필사 화면 (/transcription).
- * 링크 형식: https://dev-app.play-logos.com/transcription?user_id={user_id}
- * 구독자 id 는 쿼리스트링(?user_id=...)으로 전달된다.
- * 없으면 비구독자로 취급(말씀만 표시, 시작/완료 기록 없음).
+ * 링크 형식: https://dev-app.play-logos.com/transcription?token=...
+ * 알림톡 버튼 URL 의 ?token=... 을 그대로 서버에 보낸다.
+ * user_id / date 는 토큰 안에 들어 있으므로 따로 보내지 않는다.
  */
 export default function Transcription() {
   const [searchParams] = useSearchParams();
-  const userId = searchParams.get("user_id");
+  const token = searchParams.get("token");
 
   const [passage, setPassage] = useState(null);
-  const [already, setAlready] = useState(null); // 오늘 이미 완료한 경우의 응답(완료시각+등수)
   const [result, setResult] = useState(null); // 방금 완료 기록의 서버 응답(등수)
+  // 필사 대신 보여줄 안내 화면: { type: "already"|"expired"|"notfound", data }
+  const [notice, setNotice] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    // 오늘의 말씀 열기(= 필사 시작). GET → POST 로 변경되었고,
-    // 파라미터는 쿼리스트링이 아닌 JSON 바디로 보낸다.
-    // user_id 가 없으면 빈 바디 {} 를 보낸다(없이 보내면 422).
-    fetch(`${API_BASE}/passages/today`, {
+    if (!token) {
+      setError("유효하지 않은 링크예요. 알림톡의 버튼으로 다시 들어와 주세요.");
+      return;
+    }
+    // 필사 시작 — 토큰만 보낸다.
+    fetch(`${API_BASE}/transcriptions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(userId ? { user_id: userId } : {}),
+      body: JSON.stringify({ token }),
     })
       .then(async (r) => {
         const data = await r.json().catch(() => ({}));
-        // 오늘 이미 완료한 구독자 → 400 { code: "already_completed", completed_at, ...등수 }
-        if (r.status === 400 && data.code === "already_completed") {
-          setAlready(data);
+        if (r.ok) {
+          setPassage(data); // { date, reference, text, started_at }
           return;
         }
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        setPassage(data);
+        // 에러 분기
+        if (r.status === 400 && data.code === "already_completed") return setNotice({ type: "already", data });
+        if (r.status === 400 && data.code === "expired") return setNotice({ type: "expired", data });
+        if (r.status === 404 && data.code === "not_found") return setNotice({ type: "notfound", data });
+        if (r.status === 403) return setError("유효하지 않은 링크예요. 알림톡의 버튼으로 다시 들어와 주세요.");
+        throw new Error(`HTTP ${r.status}`);
       })
       .catch((e) => setError(e.message));
-  }, [userId]);
+  }, [token]);
 
   // 필사 완료. 100% 일치 시 서버에 완료를 기록한다.
-  // text 는 사용자가 필사한 텍스트(필수), user_id 는 선택.
   const handleComplete = (text) => {
-    fetch(`${API_BASE}/passages/today/complete`, {
+    fetch(`${API_BASE}/transcriptions/complete`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(userId ? { user_id: userId, text } : { text }),
+      body: JSON.stringify({ token, text }),
     })
       .then(async (r) => {
         const data = await r.json().catch(() => ({}));
-        // 불일치 → 400 { detail: "..." }
-        if (r.status === 400) {
-          throw new Error(
-            data.detail || "필사한 텍스트가 오늘의 말씀과 일치하지 않습니다."
-          );
-        }
+        // 불일치 → 400 { detail } (재시도 가능)
+        if (r.status === 400) throw new Error(data.detail || "필사한 텍스트가 오늘의 말씀과 일치하지 않습니다.");
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        // 200 { completed, submit_rank, speed_rank, elapsed_seconds }
-        // (비구독자/멱등 재호출은 등수 없이 { completed } 만 올 수 있음)
+        // 200 { completed, submit_rank, speed_rank, elapsed_seconds, total, average_elapsed_seconds }
+        // (멱등 재완료는 { completed } 만 올 수 있음)
         return data;
       })
       .then(setResult)
@@ -83,8 +84,10 @@ export default function Transcription() {
       });
   };
 
-  if (error) return <Center>오늘의 구절을 불러오지 못했어요 — {error}</Center>;
-  if (already) return <AlreadyDone data={already} />;
+  if (error) return <Center>{error}</Center>;
+  if (notice?.type === "already") return <AlreadyDone data={notice.data} />;
+  if (notice?.type === "expired") return <Expired data={notice.data} />;
+  if (notice?.type === "notfound") return <NotFound date={notice.data?.date} />;
   if (!passage) return <Center>오늘의 말씀을 불러오는 중…</Center>;
 
   return (
