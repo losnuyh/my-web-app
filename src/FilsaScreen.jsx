@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { isSpace, matchesTarget, scoreInput } from "./scoring";
 import { Timer, RankBoard, FONT } from "./ui";
 import NicknamePrompt from "./NicknamePrompt";
@@ -41,6 +41,20 @@ export default function FilsaScreen({
   const [input, setInput] = useState("");
   const [composing, setComposing] = useState(false);
   const [done, setDone] = useState(false);
+  const [pasteBlocked, setPasteBlocked] = useState(false); // 붙여넣기 시도 시 잠깐 안내
+
+  // 붙여넣기 안내는 잠깐 떴다 사라진다
+  useEffect(() => {
+    if (!pasteBlocked) return;
+    const id = setTimeout(() => setPasteBlocked(false), 2000);
+    return () => clearTimeout(id);
+  }, [pasteBlocked]);
+
+  // 붙여넣기/드롭 차단 — 본문을 복붙해서 빠르게 완료하는 걸 막는다
+  const blockPaste = (e) => {
+    e.preventDefault();
+    setPasteBlocked(true);
+  };
 
   const TARGET = verseText;
 
@@ -95,6 +109,11 @@ export default function FilsaScreen({
     if (v.firstErr >= t.length) return { text: "본문보다 길어요 — 뒤를 지워보세요", color: "#ff5f4c", bg: "#ffecea", icon: "✂️" };
     return { text: v.err + "개 글자가 본문과 달라요", color: "#ff5f4c", bg: "#ffecea", icon: "❌" };
   })();
+
+  // 붙여넣기 차단 안내가 떠 있으면 잠깐 그 메시지로 덮는다
+  const shownHint = pasteBlocked
+    ? { text: "붙여넣기는 막혀 있어요 — 직접 입력해 주세요 ✍️", color: "#ff5f4c", bg: "#ffecea", icon: "🚫" }
+    : hint;
 
   const border = view.done ? "#1fcb97" : view.err > 0 ? "#ff5f4c" : view.value.length ? "#6244ff" : "#ece9f8";
 
@@ -156,6 +175,8 @@ export default function FilsaScreen({
               onChange={handleInput}
               onCompositionStart={() => setComposing(true)}
               onCompositionEnd={handleCompositionEnd}
+              onPaste={blockPaste}
+              onDrop={blockPaste}
               readOnly={view.done}
               style={taStyle}
               autoComplete="off"
@@ -166,9 +187,9 @@ export default function FilsaScreen({
           </div>
 
           {/* hint */}
-          <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 14, padding: "12px 14px", background: hint.bg, borderRadius: 13 }}>
-            <span style={{ fontSize: 15, flex: "none" }}>{hint.icon}</span>
-            <span style={{ fontSize: 13, color: hint.color, fontWeight: 700 }}>{hint.text}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 14, padding: "12px 14px", background: shownHint.bg, borderRadius: 13 }}>
+            <span style={{ fontSize: 15, flex: "none" }}>{shownHint.icon}</span>
+            <span style={{ fontSize: 13, color: shownHint.color, fontWeight: 700 }}>{shownHint.text}</span>
           </div>
 
           {/* done overlay */}
