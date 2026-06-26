@@ -99,7 +99,14 @@ export function AlreadyDone({ data }) {
         <div style={{ fontSize: 14, color: "#6b6589", marginTop: 10, lineHeight: 1.65, fontWeight: 500, wordBreak: "keep-all" }}>
           오늘의 필사를 이미 마쳤어요.<br />내일 새로운 말씀으로 만나요!
         </div>
-        <RankBoard data={data} style={{ marginTop: 22 }} />
+        {data?.text && (
+          <div style={{ background: "#f6f4ff", borderRadius: 16, padding: "16px 18px", marginTop: 22, textAlign: "left" }}>
+            <div style={{ fontSize: 11.5, fontWeight: 900, color: "#6244ff", letterSpacing: "0.03em" }}>📖 오늘의 말씀 · 개역개정</div>
+            <div style={{ fontSize: 15, color: "#2a2550", lineHeight: 1.85, marginTop: 9, wordBreak: "keep-all", fontWeight: 600 }}>{data.text}</div>
+            {data.reference && <div style={{ fontSize: 12, color: "#a99ff0", marginTop: 9, fontWeight: 700 }}>{data.reference}</div>}
+          </div>
+        )}
+        <RankBoard data={data} style={{ marginTop: 18 }} />
         {when && (
           <div style={{ marginTop: 14, fontSize: 12.5, color: "#a99ff0", fontWeight: 700 }}>
             완료 시각 · {when}
