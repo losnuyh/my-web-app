@@ -130,7 +130,7 @@ export function AlreadyDone({ data, token }) {
   const when = formatCompletedAt(data?.completed_at);
   return (
     <CardScreen>
-      <NoticeHead icon="✅" title="오늘은 이미 완료했어요 🙌" subtitle={<>오늘의 필사를 이미 마쳤어요.<br />내일 새로운 말씀으로 만나요!</>} />
+      <NoticeHead icon="✅" title="오늘은 이미 완료했어요 🙌" />
       <VerseCard text={data?.text} reference={data?.reference} />
       <RankBoard data={data} style={{ marginTop: 18 }} />
       {when && <div style={{ marginTop: 14, fontSize: 12.5, color: "#a99ff0", fontWeight: 700 }}>완료 시각 · {when}</div>}
