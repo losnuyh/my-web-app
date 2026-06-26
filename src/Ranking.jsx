@@ -17,7 +17,7 @@ function formatClock(iso) {
 
 const TABS = [
   { key: "speed", label: "⚡ 빠른 순", listKey: "by_speed", rankKey: "speed_rank", suffix: "등" },
-  { key: "submit", label: "🏅 먼저 낸 순", listKey: "by_submit", rankKey: "submit_rank", suffix: "번째" },
+  { key: "submit", label: "🏅 먼저 낸 순", listKey: "by_submit", rankKey: "submit_rank", suffix: "등" },
 ];
 
 // 탭별 주/보조 표시값 (속도=걸린시간 / 제출=완료시각이 핵심)
@@ -88,7 +88,7 @@ function MeCard({ me, tab, average }) {
         <div style={{ marginLeft: "auto", fontSize: 16, fontWeight: 900, fontVariantNumeric: "tabular-nums", flex: "none" }}>{formatDuration(me.elapsed_seconds)}</div>
       </div>
       <div style={{ fontSize: 12, fontWeight: 700, opacity: 0.92, marginTop: 8 }}>
-        ⚡ 속도 {me.speed_rank}등 · 🏅 제출 {me.submit_rank}번째{cmp ? ` · ${cmp}` : ""}
+        ⚡ 속도 {me.speed_rank}등 · 🏅 제출 {me.submit_rank}등{cmp ? ` · ${cmp}` : ""}
       </div>
     </div>
   );
