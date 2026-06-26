@@ -30,7 +30,7 @@ export default function NicknamePrompt({ token }) {
       .catch(() => setHidden(true));
   }, [token]);
 
-  const goRanking = () => navigate(`/ranking?token=${encodeURIComponent(token)}`);
+  const goRanking = () => navigate("/ranking"); // 토큰은 sessionStorage 에 있음
 
   const save = async () => {
     const nickname = value.trim();
@@ -43,6 +43,11 @@ export default function NicknamePrompt({ token }) {
     const { status, ok } = await postJson("/nickname", token, { nickname });
     if (status === 422) {
       setErr("닉네임은 2~10글자로 입력해 주세요.");
+      setSaving(false);
+      return;
+    }
+    if (status === 401 || status === 403) {
+      setErr("링크가 만료됐어요. 알림톡에서 새 링크로 다시 들어와 주세요.");
       setSaving(false);
       return;
     }

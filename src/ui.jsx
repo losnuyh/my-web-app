@@ -150,6 +150,27 @@ export function Expired({ data }) {
   );
 }
 
+// 토큰 만료/위조(401) 안내.
+//  - token_expired → 링크 만료(7일), 새 알림톡 유도
+//  - 그 외(invalid_token 등) → 잘못된 접근
+export function LinkError({ code }) {
+  const expired = code === "token_expired";
+  return (
+    <CardScreen>
+      <NoticeHead
+        icon={expired ? "⏰" : "🚫"}
+        iconBg={expired ? "#fff7ec" : "#ffecea"}
+        title={expired ? "링크가 만료됐어요" : "유효하지 않은 링크예요"}
+        subtitle={
+          expired
+            ? <>링크는 발급 후 7일간만 열려요.<br />알림톡에서 새 링크로 다시 들어와 주세요.</>
+            : <>알림톡의 버튼으로 다시 들어와 주세요.</>
+        }
+      />
+    </CardScreen>
+  );
+}
+
 // 아직 공개되지 않은(미래) 말씀.
 // data = not_found 응답 { date }
 export function NotFound({ date }) {

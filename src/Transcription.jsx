@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
 import FilsaScreen from "./FilsaScreen";
 import { postJson } from "./api";
-import { Center, AlreadyDone, Expired, NotFound } from "./ui";
+import { useToken } from "./token";
+import { Center, AlreadyDone, Expired, NotFound, LinkError } from "./ui";
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -17,12 +17,11 @@ function formatDate(iso) {
 /**
  * 필사 화면 (/transcription).
  * 링크 형식: https://dev-app.play-logos.com/transcription?token=...
- * 알림톡 버튼 URL 의 ?token=... 을 그대로 서버에 보낸다.
- * user_id / date 는 토큰 안에 들어 있으므로 따로 보내지 않는다.
+ * 진입 시 ?token 은 sessionStorage 로 옮겨지고 주소에선 제거된다(token.jsx).
+ * API 호출엔 Authorization 헤더로 실린다. user_id/date 는 토큰 안에 있다.
  */
 export default function Transcription() {
-  const [searchParams] = useSearchParams();
-  const token = searchParams.get("token");
+  const token = useToken();
 
   const [passage, setPassage] = useState(null);
   const [result, setResult] = useState(null); // 방금 완료 기록의 서버 응답(등수)
@@ -42,10 +41,10 @@ export default function Transcription() {
           setPassage(data); // { date, reference, text, started_at }
           return;
         }
+        if (status === 401 || status === 403) return setNotice({ type: "linkerror", data }); // 만료/위조
         if (status === 400 && data.code === "already_completed") return setNotice({ type: "already", data });
         if (status === 400 && data.code === "expired") return setNotice({ type: "expired", data });
         if (status === 404 && data.code === "not_found") return setNotice({ type: "notfound", data });
-        if (status === 403) return setError("유효하지 않은 링크예요. 알림톡의 버튼으로 다시 들어와 주세요.");
         throw new Error(`HTTP ${status}`);
       })
       .catch((e) => setError(e.message));
@@ -72,6 +71,7 @@ export default function Transcription() {
   };
 
   if (error) return <Center>{error}</Center>;
+  if (notice?.type === "linkerror") return <LinkError code={notice.data?.detail?.code} />;
   if (notice?.type === "already") return <AlreadyDone data={notice.data} token={token} />;
   if (notice?.type === "expired") return <Expired data={notice.data} />;
   if (notice?.type === "notfound") return <NotFound date={notice.data?.date} />;
