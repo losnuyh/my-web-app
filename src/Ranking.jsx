@@ -83,7 +83,7 @@ function Row({ entry, metric }) {
 }
 
 // 내 기록 카드 — 활성 탭 등수를 크게, 나머지 등수와 평균 비교를 보조로.
-function MeCard({ me, tab, average }) {
+function MeCard({ me, tab, avgSpeed, avgSubmit }) {
   const rank = me[tab.rankKey];
   // 보드별 소요: 속도=타이핑(완료−시작), 제출=발송→완료(없으면 null)
   const speedSec = me.speed_elapsed_seconds;
@@ -92,20 +92,24 @@ function MeCard({ me, tab, average }) {
     tab.key === "speed"
       ? (speedSec != null ? formatDuration(speedSec) : "기록 없음")
       : formatResponse(submitSec, true);
-  // 평균은 '타이핑 기준'이므로 타이핑 소요와 비교 (속도 탭에서만 의미 있음)
-  const diff = average != null && speedSec != null ? average - speedSec : null;
-  const cmp =
-    diff == null ? null
-    : diff >= 0 ? `타이핑 평균보다 ${formatDuration(diff)} 빠름 🔥`
-    : `타이핑 평균보다 ${formatDuration(-diff)} 느림`;
 
-  // 보드별로 다른 보조 정보:
-  //  - 속도 탭: 제출 등수(교차) + 타이핑 평균 비교
-  //  - 제출 탭: 속도 등수(교차) + 제출 시각
+  // 탭별 평균 비교 (속도=타이핑 평균 / 제출=광속 평균)
+  const compare = (avg, mine, label, fmt) => {
+    if (avg == null || mine == null) return null;
+    const d = avg - mine;
+    return d >= 0 ? `${label}보다 ${fmt(d)} 빠름 🔥` : `${label}보다 ${fmt(-d)} 느림`;
+  };
+  const cmp =
+    tab.key === "speed"
+      ? compare(avgSpeed, speedSec, "타이핑 평균", formatDuration)
+      : compare(avgSubmit, submitSec, "광속 평균", (s) => formatResponse(s));
+
+  // 보조: 반대편 등수(교차) + 평균 비교(제출 탭은 평균 없으면 제출 시각으로 폴백)
+  const submitExtra = cmp || (me.completed_at ? `${formatClock(me.completed_at)} 제출` : "");
   const sub =
     tab.key === "speed"
       ? `🏅 제출 ${me.submit_rank}등${cmp ? ` · ${cmp}` : ""}`
-      : `⚡ 속도 ${me.speed_rank}등${me.completed_at ? ` · ${formatClock(me.completed_at)} 제출` : ""}`;
+      : `⚡ 속도 ${me.speed_rank}등${submitExtra ? ` · ${submitExtra}` : ""}`;
   return (
     <div style={{ background: PRIMARY, color: "#fff", borderRadius: 18, padding: "15px 18px", margin: "16px 0", boxShadow: `0 6px 0 ${PRIMARY_DARK}` }}>
       <div style={{ fontSize: 12, fontWeight: 800, opacity: 0.85 }}>내 기록 · {tab.label}</div>
@@ -154,6 +158,12 @@ export default function Ranking() {
   const hasPodium = list.length >= 3;
   const listRows = hasPodium ? list.slice(3) : list;
 
+  // 헤더 평균도 탭에 맞춰: 빨리 친 순=타이핑 평균 / 광속 제출 순=광속 평균(서버 제공 시)
+  const avgText =
+    tab.key === "speed"
+      ? (data.average_elapsed_seconds != null ? `타이핑 평균 ${formatDuration(data.average_elapsed_seconds)}` : "")
+      : (data.average_submit_seconds != null ? `광속 평균 ${formatResponse(data.average_submit_seconds)}` : "");
+
   return (
     <div style={{ position: "relative", overflow: "hidden", minHeight: "100vh", background: "#f3f0ff", fontFamily: FONT, color: "#241c4d" }}>
       <div style={{ position: "absolute", top: -70, right: -40, width: 240, height: 240, borderRadius: "50%", background: "#ffe07a", opacity: 0.4 }} />
@@ -166,8 +176,7 @@ export default function Ranking() {
           <div style={{ fontSize: 22, fontWeight: 900, letterSpacing: "-0.03em" }}>🏆 오늘의 랭킹</div>
         </div>
         <div style={{ fontSize: 13, color: "#8d87a8", fontWeight: 600, margin: "6px 0 16px 44px" }}>
-          {data.reference ? `${data.reference} · ` : ""}총 {data.total ?? 0}명 참여
-          {data.average_elapsed_seconds != null ? ` · 타이핑 평균 ${formatDuration(data.average_elapsed_seconds)}` : ""}
+          {data.reference ? `${data.reference} · ` : ""}총 {data.total ?? 0}명 참여{avgText ? ` · ${avgText}` : ""}
         </div>
 
         {/* 탭 */}
@@ -185,7 +194,7 @@ export default function Ranking() {
 
         {/* 내 기록 */}
         {me ? (
-          <MeCard me={me} tab={tab} average={data.average_elapsed_seconds} />
+          <MeCard me={me} tab={tab} avgSpeed={data.average_elapsed_seconds} avgSubmit={data.average_submit_seconds} />
         ) : (
           <div style={{ background: "#fff", borderRadius: 16, padding: "14px 16px", margin: "16px 0", fontSize: 13.5, color: "#6b6589", fontWeight: 700, textAlign: "center", boxShadow: "0 4px 0 #e3def7" }}>
             오늘 필사를 완료하면 랭킹에 올라요! 🔥
