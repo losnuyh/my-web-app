@@ -41,6 +41,11 @@ export default function NicknamePrompt({ token }) {
     setSaving(true);
     setErr("");
     const { status, ok } = await postJson("/nickname", token, { nickname });
+    if (status === 409) {
+      setErr("이미 사용 중인 닉네임입니다. 다른 닉네임을 입력해 주세요.");
+      setSaving(false);
+      return;
+    }
     if (status === 422) {
       setErr("닉네임은 2~10글자로 입력해 주세요.");
       setSaving(false);
