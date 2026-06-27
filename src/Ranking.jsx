@@ -15,17 +15,28 @@ function formatClock(iso) {
   return d.toLocaleTimeString("ko-KR", { timeZone: "Asia/Seoul", hour: "numeric", minute: "2-digit" });
 }
 
+// 제출 보드 소요(초, = 완료−발송)를 표기. full 이면 "5분 만에 완료", 아니면 "5분"(시상대용).
+// 초 단위는 버리고 분/시간분으로만.
+function formatResponse(sec, full) {
+  if (sec == null) return "";
+  const min = Math.max(0, Math.round(sec / 60));
+  const base = min < 1 ? "방금" : min < 60 ? `${min}분` : `${Math.floor(min / 60)}시간 ${min % 60}분`;
+  if (!full) return base;
+  return base === "방금" ? "방금 완료" : `${base} 만에 완료`;
+}
+
 const TABS = [
-  { key: "speed", label: "⚡ 빠른 순", listKey: "by_speed", rankKey: "speed_rank", suffix: "등" },
-  { key: "submit", label: "🏅 먼저 낸 순", listKey: "by_submit", rankKey: "submit_rank", suffix: "등" },
+  { key: "speed", label: "⚡ 빨리 친 순", desc: "타이핑을 가장 빠르게 한 순 · 시작→완료까지 걸린 시간", listKey: "by_speed", rankKey: "speed_rank", suffix: "등" },
+  { key: "submit", label: "🏅 일찍 제출 순", desc: "오늘 가장 일찍 제출한 순", listKey: "by_submit", rankKey: "submit_rank", suffix: "등" },
 ];
 
-// 탭별 주/보조 표시값 (속도=걸린시간 / 제출=완료시각이 핵심)
-const primaryText = (e, key) => (key === "speed" ? formatDuration(e.elapsed_seconds) : formatClock(e.completed_at));
-const secondaryText = (e, key) =>
-  key === "speed"
-    ? (e.completed_at ? `${formatClock(e.completed_at)} 완료` : "")
-    : (e.elapsed_seconds != null ? `${formatDuration(e.elapsed_seconds)} 걸림` : "");
+// 탭별 주 표시값 — elapsed_seconds 가 보드별로 다른 의미라 그걸 포맷만.
+//  - 빨리 친 순: 타이핑 시간(시작→완료) → "1분 35초"
+//  - 일찍 제출 순: 발송→완료 소요 → "5분 만에 완료"
+const primaryText = (e, key, full) =>
+  key === "speed" ? formatDuration(e.elapsed_seconds) : formatResponse(e.elapsed_seconds, full);
+// 보조줄 — 완료(제출) 시각
+const secondaryText = (e) => (e.completed_at ? `${formatClock(e.completed_at)} 제출` : "");
 
 const nick = (n) => n || "익명";
 
@@ -55,7 +66,7 @@ function PodiumCol({ entry, place, metric }) {
 
 function Row({ entry, metric }) {
   const me = entry.is_me;
-  const sub = secondaryText(entry, metric);
+  const sub = secondaryText(entry);
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 14px", borderRadius: 14, marginTop: 8, background: me ? "#f1eeff" : "#fff", border: `2px solid ${me ? PRIMARY : "#f0edfa"}`, boxShadow: me ? "none" : "0 3px 0 #efe9fb" }}>
       <div style={{ width: 28, textAlign: "center", fontSize: 15, fontWeight: 900, color: "#8d87a8", fontVariantNumeric: "tabular-nums" }}>{entry.rank}</div>
@@ -66,7 +77,7 @@ function Row({ entry, metric }) {
         </div>
         {sub && <div style={{ fontSize: 11, color: "#b3abd6", fontWeight: 600, marginTop: 1 }}>{sub}</div>}
       </div>
-      <div style={{ fontSize: 14, fontWeight: 900, color: PRIMARY, fontVariantNumeric: "tabular-nums", flex: "none" }}>{primaryText(entry, metric)}</div>
+      <div style={{ fontSize: 14, fontWeight: 900, color: PRIMARY, fontVariantNumeric: "tabular-nums", flex: "none", textAlign: "right" }}>{primaryText(entry, metric, true)}</div>
     </div>
   );
 }
@@ -74,18 +85,26 @@ function Row({ entry, metric }) {
 // 내 기록 카드 — 활성 탭 등수를 크게, 나머지 등수와 평균 비교를 보조로.
 function MeCard({ me, tab, average }) {
   const rank = me[tab.rankKey];
-  const diff = average != null && me.elapsed_seconds != null ? average - me.elapsed_seconds : null;
+  // 보드별 소요: 속도=타이핑(완료−시작), 제출=발송→완료(없으면 null)
+  const speedSec = me.speed_elapsed_seconds;
+  const submitSec = me.submit_elapsed_seconds;
+  const value =
+    tab.key === "speed"
+      ? (speedSec != null ? formatDuration(speedSec) : "—")
+      : (formatResponse(submitSec, true) || "—");
+  // 평균은 '타이핑 기준'이므로 타이핑 소요와 비교
+  const diff = average != null && speedSec != null ? average - speedSec : null;
   const cmp =
     diff == null ? null
-    : diff >= 0 ? `평균보다 ${formatDuration(diff)} 빠름 🔥`
-    : `평균보다 ${formatDuration(-diff)} 느림`;
+    : diff >= 0 ? `타이핑 평균보다 ${formatDuration(diff)} 빠름 🔥`
+    : `타이핑 평균보다 ${formatDuration(-diff)} 느림`;
   return (
     <div style={{ background: PRIMARY, color: "#fff", borderRadius: 18, padding: "15px 18px", margin: "16px 0", boxShadow: `0 6px 0 ${PRIMARY_DARK}` }}>
       <div style={{ fontSize: 12, fontWeight: 800, opacity: 0.85 }}>내 기록</div>
       <div style={{ display: "flex", alignItems: "baseline", gap: 9, marginTop: 5 }}>
         <div style={{ fontSize: 30, fontWeight: 900, letterSpacing: "-0.02em" }}>{rank}{tab.suffix}</div>
         <div style={{ fontSize: 14, fontWeight: 800, opacity: 0.9, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nick(me.nickname)}</div>
-        <div style={{ marginLeft: "auto", fontSize: 16, fontWeight: 900, fontVariantNumeric: "tabular-nums", flex: "none" }}>{formatDuration(me.elapsed_seconds)}</div>
+        <div style={{ marginLeft: "auto", fontSize: 16, fontWeight: 900, fontVariantNumeric: "tabular-nums", flex: "none", textAlign: "right" }}>{value}</div>
       </div>
       <div style={{ fontSize: 12, fontWeight: 700, opacity: 0.92, marginTop: 8 }}>
         ⚡ 속도 {me.speed_rank}등 · 🏅 제출 {me.submit_rank}등{cmp ? ` · ${cmp}` : ""}
@@ -156,6 +175,7 @@ export default function Ranking() {
             );
           })}
         </div>
+        <div style={{ fontSize: 12, color: "#8d87a8", fontWeight: 600, margin: "10px 2px 0" }}>{tab.desc}</div>
 
         {/* 내 기록 */}
         {me ? (
