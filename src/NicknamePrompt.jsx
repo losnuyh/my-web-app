@@ -30,7 +30,7 @@ export default function NicknamePrompt({ token }) {
       .catch(() => setHidden(true));
   }, [token]);
 
-  const goRanking = () => navigate("/ranking"); // 토큰은 sessionStorage 에 있음
+  const goRanking = () => navigate("/ranking"); // 토큰은 메모리·localStorage 에 있음
 
   const save = async () => {
     const nickname = value.trim();

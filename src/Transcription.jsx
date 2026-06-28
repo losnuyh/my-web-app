@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import FilsaScreen from "./FilsaScreen";
 import { postJson } from "./api";
+import { normalize } from "./scoring";
 import { useToken } from "./token";
 import { Center, AlreadyDone, Expired, NotFound, LinkError } from "./ui";
 
@@ -17,7 +18,7 @@ function formatDate(iso) {
 /**
  * 필사 화면 (/transcription).
  * 링크 형식: https://dev-app.play-logos.com/transcription?token=...
- * 진입 시 ?token 은 sessionStorage 로 옮겨지고 주소에선 제거된다(token.jsx).
+ * 진입 시 ?token 은 메모리·localStorage 로 옮겨지고 주소에선 제거된다(token.jsx).
  * API 호출엔 Authorization 헤더로 실린다. user_id/date 는 토큰 안에 있다.
  */
 export default function Transcription() {
@@ -41,7 +42,7 @@ export default function Transcription() {
           setPassage(data); // { date, reference, text, started_at }
           return;
         }
-        if (status === 401 || status === 403) return setNotice({ type: "linkerror", data }); // 만료/위조
+        if (status === 401 || status === 403) return setNotice({ type: "linkerror", data, status }); // 만료/위조
         if (status === 400 && data.code === "already_completed") return setNotice({ type: "already", data });
         if (status === 400 && data.code === "expired") return setNotice({ type: "expired", data });
         if (status === 404 && data.code === "not_found") return setNotice({ type: "notfound", data });
@@ -51,27 +52,27 @@ export default function Transcription() {
   }, [token]);
 
   // 필사 완료. 100% 일치 시 서버에 완료를 기록한다.
+  // 서버 대조와 어긋나지 않도록 클라와 동일하게 정규화한 텍스트를 보낸다.
   const handleComplete = (text) => {
-    postJson("/transcriptions/complete", token, { text })
+    setResult(null); // '채점 확인 중…' 상태로 (재시도 시에도 되돌림)
+    postJson("/transcriptions/complete", token, { text: normalize(text) })
       .then(({ status, ok, data }) => {
-        // 불일치 → 400 { detail } (재시도 가능)
-        if (status === 400) throw new Error(data.detail || "필사한 텍스트가 오늘의 말씀과 일치하지 않습니다.");
-        if (!ok) throw new Error(`HTTP ${status}`);
-        // 200 { completed, submit_rank, speed_rank, elapsed_seconds, total, average_elapsed_seconds }
-        // (멱등 재완료는 { completed } 만 올 수 있음)
-        return data;
+        // 성공: { completed, submit_rank, speed_rank, elapsed_seconds, total, ... }
+        if (ok) return data;
+        // 실패는 화면에 드러낸다(원인 코드 보이게). 400 불일치 / 401 만료 등.
+        const reason = status === 400 ? (data.detail || "본문 불일치") : `오류 ${status}`;
+        console.error("필사 완료 기록 실패:", status, data);
+        return { failed: true, reason };
       })
       .then(setResult)
       .catch((e) => {
-        // 화면 완료 UX 는 로컬 채점으로 이미 표시됨. 기록 실패는 로깅만.
-        // result 를 빈 값으로 채워 '저장 중…' 표시는 거둔다.
-        console.error("필사 완료 기록 실패:", e.message);
-        setResult({});
+        console.error("필사 완료 기록 네트워크 오류:", e);
+        setResult({ failed: true, reason: "네트워크 오류" });
       });
   };
 
   if (error) return <Center>{error}</Center>;
-  if (notice?.type === "linkerror") return <LinkError code={notice.data?.detail?.code} />;
+  if (notice?.type === "linkerror") return <LinkError code={notice.data?.detail?.code} detail={`진단: 진입 ${notice.status}`} />;
   if (notice?.type === "already") return <AlreadyDone data={notice.data} token={token} />;
   if (notice?.type === "expired") return <Expired data={notice.data} />;
   if (notice?.type === "notfound") return <NotFound date={notice.data?.date} />;

@@ -1,24 +1,35 @@
 import React, { createContext, useContext, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 
-// 토큰을 URL 에 남기지 않기 위한 처리.
-//  - 진입 시 ?token=... 을 한 번 읽어 sessionStorage 에 저장하고
-//  - 주소창에서 token 을 즉시 제거(history replace)
-//  - 이후 모든 화면은 useToken() 으로 sessionStorage 의 토큰을 읽는다
-//  - sessionStorage 는 새로고침은 버티고, 탭을 닫으면 사라진다(재진입 필요)
+// 토큰 보관 — URL → 메모리 → localStorage 3중으로 유실을 막는다.
+//  - localStorage: 새로고침/웹뷰 재로드에도 살아남음(sessionStorage 보다 견고).
+//  - 메모리(memToken): storage 가 막힌 환경(사파리 프라이빗/일부 인앱브라우저)에서도
+//    리로드 없는 SPA 이동은 토큰을 유지.
+//  - 진입 시 ?token 은 저장 후 주소에서 제거.
+//  ※ 토큰은 7일 만료라 localStorage 에 둬도 위험이 제한적.
 const KEY = "logos_token";
+let memToken = null;
+
+function persist(t) {
+  memToken = t;
+  try { localStorage.setItem(KEY, t); } catch { /* 저장 불가 환경: 메모리로 버팀 */ }
+}
+function load() {
+  if (memToken) return memToken;
+  try { return localStorage.getItem(KEY); } catch { return null; }
+}
+
 const TokenContext = createContext(null);
 
 export function TokenProvider({ children }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const urlToken = searchParams.get("token");
-
-  // 첫 렌더에 토큰을 바로 쓸 수 있도록: URL 우선, 없으면 저장된 값.
-  const token = urlToken || sessionStorage.getItem(KEY);
+  if (urlToken) memToken = urlToken; // 효과 실행 전이라도 즉시 메모리 확보
+  const token = urlToken || load();
 
   useEffect(() => {
     if (!urlToken) return;
-    sessionStorage.setItem(KEY, urlToken);
+    persist(urlToken);
     // 다른 쿼리는 보존하고 token 만 주소에서 제거
     const next = new URLSearchParams(searchParams);
     next.delete("token");

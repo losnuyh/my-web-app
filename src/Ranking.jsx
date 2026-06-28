@@ -133,22 +133,31 @@ export default function Ranking() {
   const token = useToken();
 
   const [data, setData] = useState(null);
-  const [linkCode, setLinkCode] = useState(null);
+  const [linkErr, setLinkErr] = useState(null); // { code, detail } — 만료/위조/토큰없음
   const [error, setError] = useState(null);
   const [tabKey, setTabKey] = useState("speed");
 
   useEffect(() => {
-    if (!token) return setLinkCode("invalid_token");
+    if (!token) {
+      console.error("랭킹: 토큰 없음 (저장소 유실/차단 — URL·메모리·localStorage 모두 비어있음)");
+      return setLinkErr({ code: "invalid_token", detail: "진단: 토큰 없음 (저장소 유실/차단)" });
+    }
     getJson("/rankings/today", token)
       .then(({ ok, status, data }) => {
-        if (status === 401 || status === 403) return setLinkCode(data?.detail?.code || "invalid_token");
+        if (status === 401 || status === 403) {
+          console.error("랭킹 인증 실패", status, data, "— 동일 토큰으로 /nickname 은 됐는지 확인");
+          return setLinkErr({ code: data?.detail?.code || "invalid_token", detail: `진단: 랭킹 ${status}` });
+        }
         if (!ok) throw new Error(`HTTP ${status}`);
         setData(data);
       })
-      .catch((e) => setError(e.message));
+      .catch((e) => {
+        console.error("랭킹 로드 실패", e);
+        setError(e.message);
+      });
   }, [token]);
 
-  if (linkCode) return <LinkError code={linkCode} />;
+  if (linkErr) return <LinkError code={linkErr.code} detail={linkErr.detail} />;
   if (error) return <Center>랭킹을 불러오지 못했어요 — {error}</Center>;
   if (!data) return <Center>랭킹을 불러오는 중…</Center>;
 

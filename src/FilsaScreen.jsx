@@ -40,7 +40,8 @@ export default function FilsaScreen({
 } = {}) {
   const [input, setInput] = useState("");
   const [composing, setComposing] = useState(false);
-  const [done, setDone] = useState(false);
+  const [done, setDone] = useState(false); // 로컬 일치 → 제출(입력 잠금). 축하는 서버 확인 후.
+  const [submittedText, setSubmittedText] = useState(""); // 재시도용
   const [pasteBlocked, setPasteBlocked] = useState(false); // 붙여넣기 시도 시 잠깐 안내
 
   // 붙여넣기 안내는 잠깐 떴다 사라진다
@@ -58,13 +59,17 @@ export default function FilsaScreen({
 
   const TARGET = verseText;
 
-  // text: 사용자가 필사한 텍스트(서버 완료 기록에 그대로 전달)
+  // 로컬 일치 시: 입력 잠그고 서버에 제출(축하는 서버 응답 후 오버레이에서).
   const finish = (text) => {
     if (!done) {
       setDone(true);
+      setSubmittedText(text);
       onComplete && onComplete(text);
     }
   };
+
+  // 서버 기록 실패 시 같은 텍스트로 재시도
+  const retry = () => onComplete && onComplete(submittedText);
 
   const handleInput = (e) => {
     if (done) return;
@@ -193,21 +198,36 @@ export default function FilsaScreen({
           </div>
 
           {/* done overlay */}
-          {view.done && (
+          {done && (
             <div style={{ position: "absolute", inset: 0, zIndex: 20, background: "#faf9ff", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", padding: 40, animation: "lg-fadeUp .4s ease", overflow: "hidden", boxSizing: "border-box" }}>
-              <div style={{ width: 84, height: 84, borderRadius: "50%", background: "#e6faf2", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 42, animation: "lg-popIn .55s ease", position: "relative", zIndex: 2 }}>🎉</div>
-              <div style={{ fontSize: 22, fontWeight: 900, marginTop: 20, letterSpacing: "-0.03em", position: "relative", zIndex: 2 }}>클리어! 오늘 완료 🙌</div>
-              <div style={{ background: "#fff", borderRadius: 16, padding: "18px 18px", marginTop: 22, boxShadow: "0 6px 0 #e3def7", position: "relative", zIndex: 2 }}>
-                <div style={{ fontSize: 16, color: "#2a2550", lineHeight: 1.9, wordBreak: "keep-all", fontWeight: 600 }}>“{TARGET}”</div>
-                <div style={{ fontSize: 12, color: "#6244ff", fontWeight: 800, marginTop: 11 }}>{reference} · 개역개정</div>
-              </div>
-              {/* 서버가 등수를 내려주면 표시, 아직이면 저장 중 안내 */}
               {result == null ? (
-                <div style={{ position: "relative", zIndex: 2, marginTop: 16, fontSize: 12.5, color: "#a99ff0", fontWeight: 700 }}>기록 저장 중…</div>
+                // 서버 확인 대기 — 축하는 아직
+                <>
+                  <div style={{ fontSize: 40, position: "relative", zIndex: 2 }}>⏳</div>
+                  <div style={{ fontSize: 19, fontWeight: 900, marginTop: 14, letterSpacing: "-0.02em", position: "relative", zIndex: 2 }}>채점 확인 중…</div>
+                  <div style={{ fontSize: 13, color: "#8d87a8", fontWeight: 600, marginTop: 8, position: "relative", zIndex: 2 }}>서버에서 일치 여부를 확인하고 있어요</div>
+                </>
+              ) : result.failed ? (
+                // 서버 거부 — 축하 없이 재시도
+                <>
+                  <div style={{ width: 84, height: 84, borderRadius: "50%", background: "#ffecea", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 42, position: "relative", zIndex: 2 }}>😢</div>
+                  <div style={{ fontSize: 20, fontWeight: 900, marginTop: 18, letterSpacing: "-0.02em", position: "relative", zIndex: 2 }}>완료 처리에 실패했어요</div>
+                  <div style={{ fontSize: 13, color: "#ff5f4c", fontWeight: 700, marginTop: 8, lineHeight: 1.6, position: "relative", zIndex: 2 }}>{result.reason}</div>
+                  <button onClick={retry} style={{ position: "relative", zIndex: 2, marginTop: 20, height: 50, padding: "0 28px", border: "none", borderRadius: 14, fontFamily: "inherit", fontSize: 15, fontWeight: 900, background: "#6244ff", color: "#fff", cursor: "pointer", boxShadow: "0 5px 0 #4326d6" }}>다시 시도</button>
+                </>
               ) : (
-                <RankBoard data={result} style={{ position: "relative", zIndex: 2, marginTop: 18, width: "100%", maxWidth: 320 }} />
+                // 서버 확인 완료 = 진짜 클리어
+                <>
+                  <div style={{ width: 84, height: 84, borderRadius: "50%", background: "#e6faf2", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 42, animation: "lg-popIn .55s ease", position: "relative", zIndex: 2 }}>🎉</div>
+                  <div style={{ fontSize: 22, fontWeight: 900, marginTop: 20, letterSpacing: "-0.03em", position: "relative", zIndex: 2 }}>클리어! 오늘 완료 🙌</div>
+                  <div style={{ background: "#fff", borderRadius: 16, padding: "18px 18px", marginTop: 22, boxShadow: "0 6px 0 #e3def7", position: "relative", zIndex: 2 }}>
+                    <div style={{ fontSize: 16, color: "#2a2550", lineHeight: 1.9, wordBreak: "keep-all", fontWeight: 600 }}>“{TARGET}”</div>
+                    <div style={{ fontSize: 12, color: "#6244ff", fontWeight: 800, marginTop: 11 }}>{reference} · 개역개정</div>
+                  </div>
+                  <RankBoard data={result} style={{ position: "relative", zIndex: 2, marginTop: 18, width: "100%", maxWidth: 320 }} />
+                  <NicknamePrompt token={token} />
+                </>
               )}
-              <NicknamePrompt token={token} />
             </div>
           )}
         </div>

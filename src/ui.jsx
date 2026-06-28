@@ -153,7 +153,7 @@ export function Expired({ data }) {
 // 토큰 만료/위조(401) 안내.
 //  - token_expired → 링크 만료(7일), 새 알림톡 유도
 //  - 그 외(invalid_token 등) → 잘못된 접근
-export function LinkError({ code }) {
+export function LinkError({ code, detail }) {
   const expired = code === "token_expired";
   return (
     <CardScreen>
@@ -167,6 +167,7 @@ export function LinkError({ code }) {
             : <>알림톡의 버튼으로 다시 들어와 주세요.</>
         }
       />
+      {detail && <div style={{ marginTop: 18, fontSize: 11, color: "#c4bfe0", fontWeight: 600 }}>{detail}</div>}
     </CardScreen>
   );
 }
