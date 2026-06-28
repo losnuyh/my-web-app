@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import NicknamePrompt from "./NicknamePrompt";
+import Unsubscribe from "./Unsubscribe";
 
 export const FONT = "Pretendard, 'Apple SD Gothic Neo', sans-serif";
 
@@ -135,6 +136,7 @@ export function AlreadyDone({ data, token }) {
       <RankBoard data={data} style={{ marginTop: 18 }} />
       {when && <div style={{ marginTop: 14, fontSize: 12.5, color: "#a99ff0", fontWeight: 700 }}>완료 시각 · {when}</div>}
       <NicknamePrompt token={token} />
+      {token && <Unsubscribe token={token} />}
     </CardScreen>
   );
 }

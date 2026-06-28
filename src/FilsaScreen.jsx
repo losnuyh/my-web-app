@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { isSpace, matchesTarget, scoreInput } from "./scoring";
 import { Timer, RankBoard, FONT } from "./ui";
 import NicknamePrompt from "./NicknamePrompt";
+import Unsubscribe from "./Unsubscribe";
 
 /**
  * 로고스(logos) — 필사 화면 (게임풍)
@@ -196,6 +197,9 @@ export default function FilsaScreen({
             <span style={{ fontSize: 15, flex: "none" }}>{shownHint.icon}</span>
             <span style={{ fontSize: 13, color: shownHint.color, fontWeight: 700 }}>{shownHint.text}</span>
           </div>
+
+          {/* 구독 취소 — 작게 */}
+          {token && <Unsubscribe token={token} />}
 
           {/* done overlay */}
           {done && (
